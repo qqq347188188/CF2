@@ -1,0 +1,45 @@
+name: 构建 CFM 222 作弊版 IPA
+
+on:
+  workflow_dispatch:
+    inputs:
+      ipa_url:
+        description: '222.ipa 的直接下载链接（网盘直链或对象存储）'
+        required: true
+        type: string
+
+jobs:
+  build:
+    runs-on: macos-14
+    steps:
+      - name: 检出仓库
+        uses: actions/checkout@v4
+
+      - name: 安装依赖工具
+        run: |
+          brew install insert_dylib ldid 2>/dev/null || true
+          # Theos
+          git clone --recursive https://github.com/theos/theos.git $HOME/theos
+          echo "THEOS=$HOME/theos" >> $GITHUB_ENV
+
+      - name: 下载原始 IPA
+        run: |
+          curl -L --retry 3 "${{ inputs.ipa_url }}" -o 222.ipa
+          ls -lh 222.ipa
+
+      - name: 编译 hook dylib
+        run: |
+          export THEOS=$HOME/theos
+          make -j2
+          find . -name 'CFCheatHook.dylib' | head -n1
+
+      - name: 注入并打包
+        run: |
+          bash build_and_package.sh 222.ipa
+
+      - name: 上传成品
+        uses: actions/upload-artifact@v4
+        with:
+          name: 222-cheat
+          path: 222-cheat.ipa
+          retention-days: 7
